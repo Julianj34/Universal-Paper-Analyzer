@@ -4,28 +4,44 @@ from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
-import argparse
+import time
 
+# Load environment variables
 load_dotenv()
 
-# Setup ChatGPT Model (günstigeres Modell verwenden)
-chatgpt_model = ChatOpenAI(model_name="gpt-4o", temperature=0.3)
+# Setup ChatGPT Model (can be adjusted based on OpenAI account settings)
+MODEL_NAME = os.getenv("GPT_MODEL", "gpt-4o")
+TEMPERATURE = float(os.getenv("GPT_TEMPERATURE", 0.3))
 
-# Default Prompt Template
-PROMPT_TEMPLATE = '''Analysiere das Paper anhand der folgenden fünf Prinzipien:
+chatgpt_model = ChatOpenAI(model_name=MODEL_NAME, temperature=TEMPERATURE)
+
+# Universal Makro-Prompt for Comprehensive Paper Analysis
+MACRO_PROMPT = '''
+Führe eine umfassende, systemische Analyse dieses wissenschaftlichen Papers durch, basierend auf den folgenden fünf Kernprinzipien:
+
 1. Systemische Definition (Zentrale Fragen und Ziele)
 2. Interdisziplinarität (Beteiligte Disziplinen)
 3. Deep Data & Vernetzung (Wichtige Datenquellen)
 4. Mustererkennung (Zentrale Muster und Mechanismen)
-5. Validierung & Kreativität (Kritische Punkte und Innovationen)'''
+5. Validierung & Kreativität (Kritische Punkte und Innovationen)
+
+Erstelle eine strukturierte, interdisziplinäre Synthese, die systemische Zusammenhänge offenlegt, zentrale Muster erkennt und innovative Ansätze zur Problemlösung integriert.
+'''
+
+# Individual Micro-Prompts for Detailed Analysis
+PROMPTS = {
+    "Systemische Definition": "Formuliere die zentralen Forschungsfragen und langfristigen Ziele dieses Papers. Welche systemischen Zusammenhänge sollen verstanden werden? Welche grundlegenden Prinzipien stehen im Fokus?",
+    "Interdisziplinarität": "Identifiziere die relevanten wissenschaftlichen Disziplinen, die zur Lösung dieser Fragestellung beitragen können. Welche Synergien zwischen etablierten und neuen Forschungsfeldern sind entscheidend, um ein umfassendes Verständnis zu erreichen?",
+    "Deep Data & Vernetzung": "Bestimme die zentralen Datenquellen und Netzwerke, die notwendig sind, um tiefgreifende Einblicke in das System zu gewinnen. Welche Daten müssen vernetzt, analysiert und integriert werden, um die gesamte Komplexität des Systems abzubilden?",
+    "Mustererkennung": "Identifiziere die kritischen Muster, Mechanismen und emergenten Eigenschaften, die das System prägen. Welche wiederkehrenden Strukturen, nicht-linearen Dynamiken oder kritischen Übergänge sind relevant, um innovative Lösungen zu entwickeln?",
+    "Validierung & Kreativität": "Stelle die Ergebnisse auf die Probe. Welche kreativen Methoden und alternativen Perspektiven können genutzt werden, um die Hypothesen zu validieren und gleichzeitig radikale Innovationen zu fördern?"
+}
 
 
 def extract_text_from_pdf(pdf_file):
     """Extracts all text from a given PDF file."""
     with fitz.open(pdf_file) as doc:
-        text = ""
-        for page in doc:
-            text += page.get_text()
+        text = "".join(page.get_text() for page in doc)
     return text
 
 
@@ -40,46 +56,57 @@ def chunk_text(text, chunk_size=3500):
     return [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
 
 
-def analyze_chunk(chunk):
-    """Analyze a single chunk using the GPT model."""
-    messages = [
-        SystemMessage(content=PROMPT_TEMPLATE),
-        HumanMessage(content=chunk)
-    ]
-    response = chatgpt_model.invoke(messages)
-    return response.content
+def analyze_chunk(chunk, prompt):
+    """Analyze a single chunk using the GPT model with a specific prompt."""
+    while True:
+        try:
+            messages = [
+                SystemMessage(content=prompt),
+                HumanMessage(content=chunk)
+            ]
+            response = chatgpt_model.invoke(messages)
+            return response.content.strip()
+        except Exception as e:
+            if "rate_limit_exceeded" in str(e).lower():
+                print("Rate-Limit erreicht. Warte 60 Sekunden...")
+                time.sleep(60)
+            else:
+                print(f"Fehler bei der Analyse eines Chunks: {e}")
+                return f"Fehler: {e}"
 
 
-def analyze_paper(pdf_file):
-    """Analyze the given research paper using the GPT model."""
+def analyze_paper(pdf_file, output_file):
+    """Analyze the given research paper using the GPT model with both macro and micro prompts."""
     paper_text = extract_text_from_pdf(pdf_file)
     print(f"Anzahl der Tokens: {count_tokens(paper_text)}")
     chunks = chunk_text(paper_text, chunk_size=3500)
     results = []
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        results = list(executor.map(analyze_chunk, chunks))
-    return "\n\n".join(results)
+
+    # Makro-Analyse
+    print("Starte Makro-Analyse...")
+    macro_results = [analyze_chunk(chunk, MACRO_PROMPT) for chunk in chunks]
+    results.append("=== Makro-Analyse ===\n" + "\n\n".join(macro_results))
+
+    # Mikro-Analysen
+    for prompt_key, prompt in PROMPTS.items():
+        print(f"Starte Analyse mit dem Prompt: {prompt_key}")
+        prompt_results = [analyze_chunk(chunk, prompt) for chunk in chunks]
+        results.append(f"=== {prompt_key} ===\n" + "\n\n".join(prompt_results))
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("\n\n".join(results))
+    print(f"Analyse abgeschlossen. Ergebnis gespeichert in: {output_file}")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Analyze scientific papers using OpenAI GPT models.")
-    parser.add_argument("pdf_file", type=str, help="Path to the PDF file for analysis.")
-    args = parser.parse_args()
-    pdf_file = args.pdf_file
-
-    if not pdf_file.endswith(".pdf"):
-        print("Fehler: Die Datei muss eine .pdf-Datei sein.")
-        return
+    pdf_file = input("Pfad zur PDF-Datei eingeben: ").strip()
+    output_file = pdf_file.replace(".pdf", "_analysis.txt")
 
     if os.path.exists(pdf_file):
         print(f"Starte Analyse für Datei: {pdf_file}")
-        result = analyze_paper(pdf_file)
-        output_file = pdf_file.replace(".pdf", "_analysis.txt")
-        with open(output_file, "w", encoding="utf-8") as f:
-            f.write(result)
-        print(f"Analyse abgeschlossen. Ergebnis gespeichert in: {output_file}")
+        analyze_paper(pdf_file, output_file)
     else:
-        print(f"Fehler: Datei '{pdf_file}' nicht gefunden.")
+        print(f"Datei '{pdf_file}' nicht gefunden.")
 
 
 if __name__ == "__main__":
