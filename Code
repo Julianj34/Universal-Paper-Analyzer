@@ -1,0 +1,86 @@
+import os
+import fitz  # PyMuPDF for PDF parsing
+from langchain_openai import ChatOpenAI
+from langchain.schema import HumanMessage, SystemMessage
+from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
+import argparse
+
+load_dotenv()
+
+# Setup ChatGPT Model (günstigeres Modell verwenden)
+chatgpt_model = ChatOpenAI(model_name="gpt-4o", temperature=0.3)
+
+# Default Prompt Template
+PROMPT_TEMPLATE = '''Analysiere das Paper anhand der folgenden fünf Prinzipien:
+1. Systemische Definition (Zentrale Fragen und Ziele)
+2. Interdisziplinarität (Beteiligte Disziplinen)
+3. Deep Data & Vernetzung (Wichtige Datenquellen)
+4. Mustererkennung (Zentrale Muster und Mechanismen)
+5. Validierung & Kreativität (Kritische Punkte und Innovationen)'''
+
+
+def extract_text_from_pdf(pdf_file):
+    """Extracts all text from a given PDF file."""
+    with fitz.open(pdf_file) as doc:
+        text = ""
+        for page in doc:
+            text += page.get_text()
+    return text
+
+
+def count_tokens(text):
+    """Counts the approximate number of tokens in a text."""
+    return len(text.split())
+
+
+def chunk_text(text, chunk_size=3500):
+    """Splits the text into smaller chunks to avoid token limit errors."""
+    words = text.split()
+    return [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+
+
+def analyze_chunk(chunk):
+    """Analyze a single chunk using the GPT model."""
+    messages = [
+        SystemMessage(content=PROMPT_TEMPLATE),
+        HumanMessage(content=chunk)
+    ]
+    response = chatgpt_model.invoke(messages)
+    return response.content
+
+
+def analyze_paper(pdf_file):
+    """Analyze the given research paper using the GPT model."""
+    paper_text = extract_text_from_pdf(pdf_file)
+    print(f"Anzahl der Tokens: {count_tokens(paper_text)}")
+    chunks = chunk_text(paper_text, chunk_size=3500)
+    results = []
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(analyze_chunk, chunks))
+    return "\n\n".join(results)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Analyze scientific papers using OpenAI GPT models.")
+    parser.add_argument("pdf_file", type=str, help="Path to the PDF file for analysis.")
+    args = parser.parse_args()
+    pdf_file = args.pdf_file
+
+    if not pdf_file.endswith(".pdf"):
+        print("Fehler: Die Datei muss eine .pdf-Datei sein.")
+        return
+
+    if os.path.exists(pdf_file):
+        print(f"Starte Analyse für Datei: {pdf_file}")
+        result = analyze_paper(pdf_file)
+        output_file = pdf_file.replace(".pdf", "_analysis.txt")
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(result)
+        print(f"Analyse abgeschlossen. Ergebnis gespeichert in: {output_file}")
+    else:
+        print(f"Fehler: Datei '{pdf_file}' nicht gefunden.")
+
+
+if __name__ == "__main__":
+    main()
