@@ -39,7 +39,7 @@ python paper_analysis.py "/path/to/your/paper.pdf"
 Example:
 
 ```bash
-python paper_analysis.py "/Users/julia/Documents/Trading Analyse strategien/Lorenz Attraktor.pdf"
+python paper_analysis.py "your pdf data"
 ```
 
 ## Requirements
