@@ -17,24 +17,25 @@ chatgpt_model = ChatOpenAI(model_name=MODEL_NAME, temperature=TEMPERATURE)
 
 # Universal Makro-Prompt for Comprehensive Paper Analysis
 MACRO_PROMPT = '''
-Führe eine umfassende, systemische Analyse dieses wissenschaftlichen Papers durch, basierend auf den folgenden fünf Kernprinzipien:
+Conduct a comprehensive, systemic analysis of this scientific paper based on the following five core principles:
 
-1. Systemische Definition (Zentrale Fragen und Ziele)
-2. Interdisziplinarität (Beteiligte Disziplinen)
-3. Deep Data & Vernetzung (Wichtige Datenquellen)
-4. Mustererkennung (Zentrale Muster und Mechanismen)
-5. Validierung & Kreativität (Kritische Punkte und Innovationen)
+1. Systemic Definition (Central Questions and Objectives)
+2. Interdisciplinarity (Relevant Disciplines)
+3. Deep Data & Networking (Key Data Sources)
+4. Pattern Recognition (Core Patterns and Mechanisms)
+5. Validation & Creativity (Critical Points and Innovations)
 
-Erstelle eine strukturierte, interdisziplinäre Synthese, die systemische Zusammenhänge offenlegt, zentrale Muster erkennt und innovative Ansätze zur Problemlösung integriert.
+Create a structured, interdisciplinary synthesis that reveals systemic connections, identifies key patterns, and integrates innovative approaches for problem-solving.
 '''
 
 # Individual Micro-Prompts for Detailed Analysis
 PROMPTS = {
-    "Systemische Definition": "Formuliere die zentralen Forschungsfragen und langfristigen Ziele dieses Papers. Welche systemischen Zusammenhänge sollen verstanden werden? Welche grundlegenden Prinzipien stehen im Fokus?",
-    "Interdisziplinarität": "Identifiziere die relevanten wissenschaftlichen Disziplinen, die zur Lösung dieser Fragestellung beitragen können. Welche Synergien zwischen etablierten und neuen Forschungsfeldern sind entscheidend, um ein umfassendes Verständnis zu erreichen?",
-    "Deep Data & Vernetzung": "Bestimme die zentralen Datenquellen und Netzwerke, die notwendig sind, um tiefgreifende Einblicke in das System zu gewinnen. Welche Daten müssen vernetzt, analysiert und integriert werden, um die gesamte Komplexität des Systems abzubilden?",
-    "Mustererkennung": "Identifiziere die kritischen Muster, Mechanismen und emergenten Eigenschaften, die das System prägen. Welche wiederkehrenden Strukturen, nicht-linearen Dynamiken oder kritischen Übergänge sind relevant, um innovative Lösungen zu entwickeln?",
-    "Validierung & Kreativität": "Stelle die Ergebnisse auf die Probe. Welche kreativen Methoden und alternativen Perspektiven können genutzt werden, um die Hypothesen zu validieren und gleichzeitig radikale Innovationen zu fördern?"
+    PROMPTS = {
+    "Systemic Definition": "Formulate the central research questions and long-term objectives of this paper. What systemic connections are intended to be understood? Which fundamental principles are the focus?",
+    "Interdisciplinarity": "Identify the relevant scientific disciplines that can contribute to solving this research question. Which synergies between established and emerging research fields are critical to achieving a comprehensive understanding?",
+    "Deep Data & Networking": "Determine the key data sources and networks necessary to gain deep insights into the system. Which data must be connected, analyzed, and integrated to capture the full complexity of the system?",
+    "Pattern Recognition": "Identify the critical patterns, mechanisms, and emergent properties that shape the system. Which recurring structures, nonlinear dynamics, or critical transitions are relevant for developing innovative solutions?",
+    "Validation & Creativity": "Put the results to the test. Which creative methods and alternative perspectives can be used to validate the hypotheses while fostering radical innovations?"
 }
 
 
