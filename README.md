@@ -36,12 +36,6 @@ Run the script from the command line with the path to the PDF file:
 python paper_analysis.py "/path/to/your/paper.pdf"
 ```
 
-Example:
-
-```bash
-python paper_analysis.py "your pdf data"
-```
-
 ## Requirements
 
 * Python 3.8+
