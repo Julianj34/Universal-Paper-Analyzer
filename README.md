@@ -1,4 +1,4 @@
-# Research-Agent
+# Universal Paper Analyzer
 
 Analyze scientific papers using OpenAI GPT models. This tool extracts text from PDF files and analyzes them based on a customizable prompt template. It is designed for researchers, students, and interdisciplinary thinkers who want to quickly extract insights from complex scientific documents.
 
