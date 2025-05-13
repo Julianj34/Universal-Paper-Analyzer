@@ -1,0 +1,135 @@
+import os
+import fitz  # PyMuPDF for PDF parsing
+from langchain_openai import ChatOpenAI
+from langchain.schema import HumanMessage, SystemMessage
+from dotenv import load_dotenv
+import time
+import re
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Setup ChatGPT Model (can be adjusted based on OpenAI account settings)
+MODEL_NAME = os.getenv("GPT_MODEL", "gpt-4o")
+TEMPERATURE = float(os.getenv("GPT_TEMPERATURE", 0.3))
+
+chatgpt_model = ChatOpenAI(model_name=MODEL_NAME, temperature=TEMPERATURE)
+
+# Universal Macro Prompt for Comprehensive Paper Analysis
+MACRO_PROMPT = '''
+Conduct a comprehensive, systematic analysis of this scientific paper based on the following five core areas:
+
+1. Systemic Definition and Objectives
+   - Formulate the central research questions and long-term goals. What systemic connections and overarching principles are the focus?
+
+2. Pattern Recognition and Mechanisms
+   - Identify the critical patterns, mechanisms, and emergent properties that define the system. What recurring structures or critical transitions are relevant?
+
+3. Evolutionary and Transformative Perspectives
+   - Examine the long-term development of the system. What evolutionary changes and disruptive potentials are evident?
+
+4. Innovative Approaches and Potentials
+   - Recognize unconventional solutions and creative ideas that go beyond traditional boundaries. What new opportunities and transformative effects are possible?
+
+5. Meta-Analysis and Comparison
+   - Place the results of this paper in the context of existing research. What connections, differences, and potential for new research questions emerge?
+
+Create a structured, interdisciplinary synthesis that reveals systemic connections, identifies central patterns, and integrates innovative approaches to problem-solving.
+'''
+
+
+def extract_text_from_pdf(pdf_file):
+    """Extracts all text from a given PDF file."""
+    with fitz.open(pdf_file) as doc:
+        return "".join(page.get_text() for page in doc)
+
+
+def count_tokens(text):
+    """Counts the approximate number of tokens in a text."""
+    return len(text.split())
+
+
+def chunk_text(text, chunk_size=3500):
+    """Splits the text into smaller chunks to avoid token limit errors."""
+    words = text.split()
+    return [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+
+
+def generate_micro_prompts(overview):
+    """Generates specialized micro-prompts based on the macro analysis overview."""
+    print("Generating specialized micro-prompts...")
+    messages = [
+        SystemMessage(content="Generate specialized micro-prompts based on this macro analysis."),
+        HumanMessage(content=overview)
+    ]
+    try:
+        response = chatgpt_model.invoke(messages)
+        prompts = response.content.strip().split('\n')
+        # Rank prompts by relevance (e.g., length and specificity)
+        ranked_prompts = sorted(prompts, key=lambda p: len(p), reverse=True)  # Longer prompts are often more specific
+        return ranked_prompts[:5]  # Return only the top 5 most relevant prompts
+    except Exception as e:
+        print(f"Error generating micro-prompts: {e}")
+        return []
+
+
+def analyze_chunk(chunk, prompt):
+    """Analyze a single chunk using the GPT model with the best prompt."""
+    while True:
+        try:
+            messages = [
+                SystemMessage(content=prompt),
+                HumanMessage(content=chunk)
+            ]
+            response = chatgpt_model.invoke(messages)
+            return response.content.strip()
+        except Exception as e:
+            if "rate_limit_exceeded" in str(e).lower():
+                print("Rate limit reached. Waiting for 60 seconds...")
+                time.sleep(60)
+            else:
+                print(f"Error analyzing chunk: {e}")
+                return f"Error: {e}"
+
+
+def analyze_paper(pdf_file, output_file):
+    """Analyze the given research paper using the GPT model with both macro and dynamic micro prompts."""
+    paper_text = extract_text_from_pdf(pdf_file)
+    print(f"Token count: {count_tokens(paper_text)}")
+    chunks = chunk_text(paper_text, chunk_size=3500)
+    results = []
+
+    # Macro Analysis
+    print("Starting macro analysis...")
+    macro_results = [analyze_chunk(chunk, MACRO_PROMPT) for chunk in chunks]
+    macro_overview = "\n\n".join(macro_results)
+    results.append("=== Macro Analysis ===\n" + macro_overview)
+
+    # Generate and rank the best 5 micro-prompts
+    micro_prompts = generate_micro_prompts(macro_overview)
+    print(f"Generated {len(micro_prompts)} specialized micro-prompts.")
+
+    # Micro-Analysis with the top-ranked prompts
+    for prompt in micro_prompts:
+        print(f"Starting analysis with specialized micro-prompt...")
+        micro_results = [analyze_chunk(chunk, prompt) for chunk in chunks]
+        results.append(f"=== Micro Analysis ===\n" + "\n\n".join(micro_results))
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("\n\n".join(results))
+    print(f"Analysis completed. Results saved to: {output_file}")
+
+
+def main():
+    pdf_file = input("Enter the path to the PDF file: ").strip()
+    output_file = pdf_file.replace(".pdf", "_analysis.txt")
+
+    if os.path.exists(pdf_file):
+        print(f"Starting analysis for file: {pdf_file}")
+        analyze_paper(pdf_file, output_file)
+    else:
+        print(f"File '{pdf_file}' not found.")
+
+
+if __name__ == "__main__":
+    main()
