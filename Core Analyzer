@@ -12,11 +12,17 @@ load_dotenv()
 # Setup ChatGPT Model (can be adjusted based on OpenAI account settings)
 MODEL_NAME = os.getenv("GPT_MODEL", "gpt-4o")
 TEMPERATURE = float(os.getenv("GPT_TEMPERATURE", 0.3))
-
 chatgpt_model = ChatOpenAI(model_name=MODEL_NAME, temperature=TEMPERATURE)
 
-# Universal Makro-Prompt for Comprehensive Paper Analysis
-MACRO_PROMPT = '''
+# === System Message: Defines persona and language ===
+SYSTEM_PROMPT = """
+You are an interdisciplinary research assistant with expertise in complexity science, systems theory, and scientific methodology.
+Analyze scientific texts deeply and clearly. Use precise and structured academic English in your responses.
+Highlight key relationships, systemic patterns, and innovative perspectives.
+"""
+
+# === Macro Prompt for overall synthesis ===
+MACRO_PROMPT = """
 Conduct a comprehensive, systemic analysis of this scientific paper based on the following five core principles:
 
 1. Systemic Definition (Central Questions and Objectives)
@@ -26,16 +32,30 @@ Conduct a comprehensive, systemic analysis of this scientific paper based on the
 5. Validation & Creativity (Critical Points and Innovations)
 
 Create a structured, interdisciplinary synthesis that reveals systemic connections, identifies key patterns, and integrates innovative approaches for problem-solving.
-'''
+"""
 
-# Individual Micro-Prompts for Detailed Analysis
+# === Micro Prompts ===
 PROMPTS = {
-    PROMPTS = {
-    "Systemic Definition": "Formulate the central research questions and long-term objectives of this paper. What systemic connections are intended to be understood? Which fundamental principles are the focus?",
-    "Interdisciplinarity": "Identify the relevant scientific disciplines that can contribute to solving this research question. Which synergies between established and emerging research fields are critical to achieving a comprehensive understanding?",
-    "Deep Data & Networking": "Determine the key data sources and networks necessary to gain deep insights into the system. Which data must be connected, analyzed, and integrated to capture the full complexity of the system?",
-    "Pattern Recognition": "Identify the critical patterns, mechanisms, and emergent properties that shape the system. Which recurring structures, nonlinear dynamics, or critical transitions are relevant for developing innovative solutions?",
-    "Validation & Creativity": "Put the results to the test. Which creative methods and alternative perspectives can be used to validate the hypotheses while fostering radical innovations?"
+    "Systemic Definition": """
+Formulate the central research questions and long-term objectives of this paper.
+What systemic relationships are to be understood? What are the key assumptions and boundaries?
+""",
+    "Interdisciplinarity": """
+Identify the relevant scientific disciplines contributing to this research.
+What interdisciplinary synergies are critical to understanding the topic deeply?
+""",
+    "Deep Data & Networking": """
+Determine the key data sources and system connections necessary for comprehensive insight.
+Which data flows and networked structures are relevant to represent the system’s complexity?
+""",
+    "Pattern Recognition": """
+Identify the key patterns, nonlinear dynamics, and emergent mechanisms in the system.
+Are there recurring structures or feedback loops?
+""",
+    "Validation & Creativity": """
+Evaluate the strengths and weaknesses of the approach.
+Which creative or alternative methodologies could improve the model or deepen insight?
+"""
 }
 
 
@@ -54,7 +74,7 @@ def count_tokens(text):
 def chunk_text(text, chunk_size=3500):
     """Splits the text into smaller chunks to avoid token limit errors."""
     words = text.split()
-    return [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+    return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
 
 
 def analyze_chunk(chunk, prompt):
@@ -62,6 +82,7 @@ def analyze_chunk(chunk, prompt):
     while True:
         try:
             messages = [
+                SystemMessage(content=SYSTEM_PROMPT),
                 SystemMessage(content=prompt),
                 HumanMessage(content=chunk)
             ]
@@ -69,46 +90,47 @@ def analyze_chunk(chunk, prompt):
             return response.content.strip()
         except Exception as e:
             if "rate_limit_exceeded" in str(e).lower():
-                print("Rate-Limit erreicht. Warte 60 Sekunden...")
+                print("Rate limit reached. Waiting 60 seconds...")
                 time.sleep(60)
             else:
-                print(f"Fehler bei der Analyse eines Chunks: {e}")
-                return f"Fehler: {e}"
+                print(f"Error analyzing chunk: {e}")
+                return f"Error: {e}"
 
 
 def analyze_paper(pdf_file, output_file):
     """Analyze the given research paper using the GPT model with both macro and micro prompts."""
     paper_text = extract_text_from_pdf(pdf_file)
-    print(f"Anzahl der Tokens: {count_tokens(paper_text)}")
+    print(f"Token count: {count_tokens(paper_text)}")
     chunks = chunk_text(paper_text, chunk_size=3500)
     results = []
 
-    # Makro-Analyse
-    print("Starte Makro-Analyse...")
+    # Macro analysis
+    print("🔍 Starting macro analysis...")
     macro_results = [analyze_chunk(chunk, MACRO_PROMPT) for chunk in chunks]
-    results.append("=== Makro-Analyse ===\n" + "\n\n".join(macro_results))
+    results.append("=== Macro Analysis ===\n" + "\n\n".join(macro_results))
 
-    # Mikro-Analysen
+    # Micro analyses
     for prompt_key, prompt in PROMPTS.items():
-        print(f"Starte Analyse mit dem Prompt: {prompt_key}")
+        print(f"🧩 Starting micro analysis: {prompt_key}")
         prompt_results = [analyze_chunk(chunk, prompt) for chunk in chunks]
         results.append(f"=== {prompt_key} ===\n" + "\n\n".join(prompt_results))
 
     with open(output_file, "w", encoding="utf-8") as f:
         f.write("\n\n".join(results))
-    print(f"Analyse abgeschlossen. Ergebnis gespeichert in: {output_file}")
+    print(f"✅ Analysis complete. Output saved to: {output_file}")
 
 
 def main():
-    pdf_file = input("Pfad zur PDF-Datei eingeben: ").strip()
+    pdf_file = input("Enter the path to your PDF file: ").strip()
     output_file = pdf_file.replace(".pdf", "_analysis.txt")
 
     if os.path.exists(pdf_file):
-        print(f"Starte Analyse für Datei: {pdf_file}")
+        print(f"🚀 Starting analysis for file: {pdf_file}")
         analyze_paper(pdf_file, output_file)
     else:
-        print(f"Datei '{pdf_file}' nicht gefunden.")
+        print(f"❌ File not found: '{pdf_file}'")
 
 
 if __name__ == "__main__":
     main()
+
